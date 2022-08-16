@@ -1,5 +1,6 @@
 package com.shencoder.webrtc_srs.pull
 
+import android.content.Context
 import android.os.Bundle
 import androidx.lifecycle.lifecycleScope
 import com.elvishew.xlog.XLog
@@ -25,10 +26,19 @@ class MainActivity : BaseSupportActivity<DefaultViewModel, ActivityMainBinding>(
     private val eglBaseContext = EglBase.create().eglBaseContext
     private lateinit var peerConnectionFactory: PeerConnectionFactory
     private var pullConnection: PeerConnection? = null
+    private var videoTrack: VideoTrack? = null
+    private var cameraVideoCapturer: CameraVideoCapturer? = null
+    private var surfaceTextureHelper: SurfaceTextureHelper? = null
+    private var peerConnection: PeerConnection? = null
 
     private companion object {
         private const val URL =
             "webrtc://${Constant.SRS_SERVER_IP}/live/livestream"
+
+        private const val URLuser1 =
+            "webrtc://${Constant.SRS_SERVER_IP}/live/user1"
+        private const val URLuser2 =
+            "webrtc://${Constant.SRS_SERVER_IP}/live/user2"
     }
 
     override fun getLayoutId(): Int {
@@ -44,7 +54,9 @@ class MainActivity : BaseSupportActivity<DefaultViewModel, ActivityMainBinding>(
     }
 
     override fun initView() {
-        mBinding.etUrl.setText(URL)
+        mBinding.etUrl.setText(URLuser1)
+        mBinding.etUrl2.setText(URLuser2)
+
         mBinding.svr.init(eglBaseContext, null)
         mBinding.btnPull.setOnClickListener {
             val url = mBinding.etUrl.text.toString().trim()
@@ -54,7 +66,148 @@ class MainActivity : BaseSupportActivity<DefaultViewModel, ActivityMainBinding>(
             }
             initPullRTC(url)
         }
+        mBinding.svrpush.init(eglBaseContext, null)
+        mBinding.btnPush.setOnClickListener {
+            val url = mBinding.etUrl2.text.toString().trim()
+            if (url.isBlank()) {
+                toastWarning("请输入推流地址")
+                return@setOnClickListener
+            }
+            initPushRTC(url)
+        }
 
+
+    }
+
+    private fun createVideoCapture(context: Context): CameraVideoCapturer? {
+        val enumerator: CameraEnumerator = if (Camera2Enumerator.isSupported(context)) {
+            Camera2Enumerator(context)
+        } else {
+            Camera1Enumerator()
+        }
+        for (name in enumerator.deviceNames) {
+            if (enumerator.isFrontFacing(name)) {
+                return enumerator.createCapturer(name, null)
+            }
+        }
+        for (name in enumerator.deviceNames) {
+            if (enumerator.isBackFacing(name)) {
+                return enumerator.createCapturer(name, null)
+            }
+        }
+        return null
+    }
+
+    private fun initPushRTC(url: String) {
+        val createAudioSource = peerConnectionFactory.createAudioSource(createAudioConstraints())
+        val audioTrack =
+            peerConnectionFactory.createAudioTrack("local_audio_track", createAudioSource)
+
+        cameraVideoCapturer = createVideoCapture(this)
+        cameraVideoCapturer?.let { capture ->
+            val videoSource = peerConnectionFactory.createVideoSource(capture.isScreencast)
+            videoTrack =
+                peerConnectionFactory.createVideoTrack("local_video_track", videoSource).apply {
+                    addSink(mBinding.svrpush)
+                }
+            surfaceTextureHelper =
+                SurfaceTextureHelper.create("surface_texture_thread", eglBaseContext)
+            capture.initialize(surfaceTextureHelper, this, videoSource.capturerObserver)
+            capture.startCapture(640, 480, 20)
+        }
+
+        val rtcConfig = PeerConnection.RTCConfiguration(emptyList())
+        rtcConfig.sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
+
+        peerConnection = peerConnectionFactory.createPeerConnection(
+            rtcConfig,
+            PeerConnectionObserver()
+        )?.apply {
+            videoTrack?.let {
+                addTransceiver(
+                    it,
+                    RtpTransceiver.RtpTransceiverInit(RtpTransceiver.RtpTransceiverDirection.SEND_ONLY)
+                )
+            }
+            addTransceiver(
+                audioTrack,
+                RtpTransceiver.RtpTransceiverInit(RtpTransceiver.RtpTransceiverDirection.SEND_ONLY)
+            )
+        }
+
+        peerConnection?.let { connection ->
+            connection.createOffer(object : SdpAdapter("createOffer") {
+                override fun onCreateSuccess(description: SessionDescription?) {
+                    super.onCreateSuccess(description)
+                    description?.let {
+                        if (it.type == SessionDescription.Type.OFFER) {
+                            val offerSdp = it.description
+                            connection.setLocalDescription(SdpAdapter("setLocalDescription"), it)
+
+                            val srsBean = SrsRequestBean(
+                                it.description,
+                                url
+                            )
+
+                            val toJson = MoshiUtil.toJson(srsBean)
+                            println("push-json:${toJson}")
+                            //请求srs
+                            lifecycleScope.launch {
+                                val result = try {
+                                    withContext(Dispatchers.IO) {
+                                        retrofitClient.apiService.publish(srsBean)
+                                    }
+                                } catch (e: Exception) {
+                                    println("push网络请求出错：${e.printStackTrace()}")
+                                    toastError("push网络请求出错：${e.printStackTrace()}")
+                                    null
+                                }
+
+                                result?.let { bean ->
+                                    if (bean.code == 0) {
+                                        XLog.i("push网络成功，code：${bean.code}")
+                                        val remoteSdp = SessionDescription(
+                                            SessionDescription.Type.ANSWER,
+                                            convertAnswerSdp(offerSdp, bean.sdp)
+                                        )
+                                        connection.setRemoteDescription(
+                                            SdpAdapter("setRemoteDescription"),
+                                            remoteSdp
+                                        )
+                                    } else {
+                                        XLog.w("push网络请求失败，code：${bean.code}")
+                                        toastWarning("push网络请求失败，code：${bean.code}")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }, MediaConstraints())
+        }
+    }
+
+    private fun createAudioConstraints(): MediaConstraints {
+        val audioConstraints = MediaConstraints()
+        //回声消除
+        audioConstraints.mandatory.add(
+            MediaConstraints.KeyValuePair(
+                "googEchoCancellation",
+                "true"
+            )
+        )
+        //自动增益
+        audioConstraints.mandatory.add(MediaConstraints.KeyValuePair("googAutoGainControl", "true"))
+        //高音过滤
+        audioConstraints.mandatory.add(MediaConstraints.KeyValuePair("googHighpassFilter", "true"))
+        //噪音处理
+        audioConstraints.mandatory.add(
+            MediaConstraints.KeyValuePair(
+                "googNoiseSuppression",
+                "true"
+            )
+        )
+        return audioConstraints
     }
 
     override fun initData(savedInstanceState: Bundle?) {
@@ -197,6 +350,7 @@ class MainActivity : BaseSupportActivity<DefaultViewModel, ActivityMainBinding>(
     override fun onDestroy() {
         super.onDestroy()
         mBinding.svr.release()
+        mBinding.svrpush.release()
         pullConnection?.dispose()
         peerConnectionFactory.dispose()
     }

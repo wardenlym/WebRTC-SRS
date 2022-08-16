@@ -25,7 +25,7 @@ class App : Application() {
             KoinAndroidApplication
                 .create(
                     this,
-                    if (BuildConfig.DEBUG) Level.DEBUG else Level.ERROR
+                    Level.ERROR
                 )
                 .modules(appModule)
         globalInit(BuildConfig.DEBUG, "WebRTC-SRS-PUSH", koinApplication)

@@ -6,41 +6,69 @@
     <data>
 
     </data>
-
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:focusable="true"
-        android:focusableInTouchMode="true"
-        tools:context=".MainActivity">
-
-        <EditText
-            android:id="@+id/etUrl"
+        android:layout_height="match_parent">
+        <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="请输入WebRTC流地址"
-            app:layout_constraintLeft_toLeftOf="parent"
-            app:layout_constraintRight_toRightOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            android:layout_height="match_parent"
+            tools:context=".MainActivity">
 
-        <org.webrtc.SurfaceViewRenderer
-            android:id="@+id/svr"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            app:layout_constraintBottom_toTopOf="@id/btnPull"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/etUrl" />
+            <EditText
+                android:id="@+id/etUrl"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="请输入WebRTC流地址"
+                app:layout_constraintLeft_toLeftOf="parent"
+                app:layout_constraintRight_toRightOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
 
-        <Button
-            android:id="@+id/btnPull"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="拉流"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/svr" />
+            <org.webrtc.SurfaceViewRenderer
+                android:id="@+id/svr"
+                android:layout_width="match_parent"
+                android:layout_height="250dp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/etUrl" />
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
+            <Button
+                android:id="@+id/btnPull"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="拉流"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/svr" />
+
+
+            <EditText
+                android:id="@+id/etUrl2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="请输入WebRTC流地址"
+                app:layout_constraintLeft_toLeftOf="parent"
+                app:layout_constraintRight_toRightOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/btnPull" />
+
+            <org.webrtc.SurfaceViewRenderer
+                android:id="@+id/svrpush"
+                android:layout_width="match_parent"
+                android:layout_height="250dp"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/etUrl2" />
+
+            <Button
+                android:id="@+id/btnPush"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="推流"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/svrpush" />
+
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </androidx.core.widget.NestedScrollView>
 </layout>
