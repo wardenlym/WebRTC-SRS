@@ -46,4 +46,5 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
     implementation 'org.webrtc:google-webrtc:1.0.32006'
     implementation 'com.github.shenbengit:MVVMKit:1.0.3'
+    implementation 'com.github.JessYanCoding:AndroidAutoSize:v1.2.1'
 }
